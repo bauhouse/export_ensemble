@@ -96,90 +96,17 @@
 
 			$sql_data = str_replace('`' . Symphony::Configuration()->get('tbl_prefix', 'database'), '`tbl_', $sql_data);
 
-			$config_string = NULL;
-			$config = Symphony::Configuration()->get();
+			## Write the install.sql file to the workspace
+			$path = '/workspace';
 
-			unset($config['symphony']['build']);
-			unset($config['symphony']['cookie_prefix']);
-			unset($config['general']['useragent']);
-			unset($config['file']['write_mode']);
-			unset($config['directory']['write_mode']);
-			unset($config['database']['host']);
-			unset($config['database']['port']);
-			unset($config['database']['user']);
-			unset($config['database']['password']);
-			unset($config['database']['db']);
-			unset($config['database']['tbl_prefix']);
-			unset($config['region']['timezone']);
+			$filename = 'install.sql';
 
-			foreach($config as $group => $set){
-				foreach($set as $key => $val){
-					$config_string .= "		\$conf['{$group}']['{$key}'] = '{$val}';" . self::CRLF;
-				}
+			if(FALSE !== file_put_contents(DOCROOT . $path . '/' . $filename, $sql_data)) {
+				Administration::instance()->Page->pageAlert(__('SQL data successfully dumped into <code>%s/%s</code>.',array($path,$filename)), Alert::SUCCESS);
 			}
-
-			$install_template = str_replace(
-				array(
-					'<!-- BUILD -->',
-					'<!-- VERSION -->',
-					'<!-- CONFIGURATION -->'
-				),
-
-				array(
-					Symphony::Configuration()->get('build', 'symphony'),
-					Symphony::Configuration()->get('version', 'symphony'),
-					trim($config_string),
-				),
-
-				file_get_contents(dirname(__FILE__) . '/lib/installer.tpl')
-			);
-
-			$archive = new ZipArchive;
-			$res = $archive->open(TMP . '/ensemble.tmp.zip', ZipArchive::CREATE);
-
-			if ($res === TRUE) {
-
-				$this->__addFolderToArchive($archive, EXTENSIONS, DOCROOT);
-				$this->__addFolderToArchive($archive, SYMPHONY, DOCROOT);
-				$this->__addFolderToArchive($archive, WORKSPACE, DOCROOT);
-
-				$archive->addFromString('install.php', $install_template);
-				$archive->addFromString('install.sql', $sql_schema);
-				$archive->addFromString('workspace/install.sql', $sql_data);
-
-				$archive->addFile(DOCROOT . '/index.php', 'index.php');
-
-				$readme_files = glob(DOCROOT . '/README.*');
-				if(is_array($readme_files) && !empty($readme_files)){
-					foreach($readme_files as $filename){
-						$archive->addFile($filename, basename($filename));
-					}
-				}
-
-				if(is_file(DOCROOT . '/README')) $archive->addFile(DOCROOT . '/README', 'README');
-				if(is_file(DOCROOT . '/LICENCE')) $archive->addFile(DOCROOT . '/LICENCE', 'LICENCE');
-				if(is_file(DOCROOT . '/update.php')) $archive->addFile(DOCROOT . '/update.php', 'update.php');
+			else {
+				Administration::instance()->Page->pageAlert(__('An error occurred while trying to write <code>%s/%s</code>.',array($path,$filename)), Alert::ERROR);
 			}
-
-			$archive->close();
-
-			header('Content-type: application/octet-stream');
-			header('Expires: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-
-		    header(
-				sprintf(
-					'Content-disposition: attachment; filename=%s-ensemble.zip',
-					Lang::createFilename(
-						Symphony::Configuration()->get('sitename', 'general')
-					)
-				)
-			);
-
-		    header('Pragma: no-cache');
-
-			readfile(TMP . '/ensemble.tmp.zip');
-			unlink(TMP . '/ensemble.tmp.zip');
-			exit();
 
 		}
 
@@ -195,24 +122,17 @@
 
 			$group = new XMLElement('fieldset');
 			$group->setAttribute('class', 'settings');
-			$group->appendChild(new XMLElement('legend', __('Export Ensemble')));
+			$group->appendChild(new XMLElement('legend', __('Save Forum Install File')));
 
 
 			$div = new XMLElement('div', NULL, array('id' => 'file-actions', 'class' => 'label'));
 			$span = new XMLElement('span', NULL, array('class' => 'frame'));
 
-			if(!class_exists('ZipArchive')){
-				$span->appendChild(
-					new XMLElement('p', '<strong>' . __('Warning: It appears you do not have the "ZipArchive" class available. Ensure that PHP was compiled with <code>--enable-zip</code>') . '</strong>')
-				);
-			}
-			else{
-				$span->appendChild(new XMLElement('button', __('Create'), array('name' => 'action[export]', 'type' => 'submit')));
-			}
+			$span->appendChild(new XMLElement('button', __('Save Forum Install File'), array('name' => 'action[export]', 'type' => 'submit')));
 
 			$div->appendChild($span);
 
-			$div->appendChild(new XMLElement('p', __('Packages entire site as a <code>.zip</code> archive for download.'), array('class' => 'help')));
+			$div->appendChild(new XMLElement('p', __('Saves the <code>install.sql</code> file to the <code>workspace</code> directory.'), array('class' => 'help')));
 
 			$group->appendChild($div);
 			$context['wrapper']->appendChild($group);
